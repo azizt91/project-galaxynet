@@ -67,14 +67,14 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
       const { error: profileError } = await supabaseAdmin
         .from("profiles")
-        .insert({
-          id: newUserId, // PENTING: Set ID sama dengan user ID
+        .update({
           idpl: customerData.idpl,
           full_name: customerData.full_name,
           address: customerData.address,
           gender: customerData.gender,
           whatsapp_number: customerData.whatsapp_number,
           status: customerData.status,
+          role: 'USER', // Override the default ADMIN role from trigger
           installation_date: customerData.installation_date,
           device_type: customerData.device_type,
           ip_static_pppoe: customerData.ip_static_pppoe,
@@ -82,7 +82,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
           package_id: customerData.package_id,
           latitude: customerData.latitude,
           longitude: customerData.longitude,
-        });
+        })
+        .eq('id', newUserId);
       console.log('Profile insert result:', { profileError });
       if (profileError) throw profileError;
 

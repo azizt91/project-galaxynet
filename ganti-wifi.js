@@ -100,8 +100,14 @@ async function getCurrentSSID(ipAddress) {
             headers['Authorization'] = `Basic ${auth}`;
         }
 
-        // Query device by IP address
-        const response = await fetch(`${genieacsUrl}/devices?query={"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress":"${ipAddress}"}`, {
+        // Helper to build query (IP vs PPPoE Username)
+        const isIpAddress = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipAddress);
+        let queryStr = isIpAddress 
+            ? `{"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress":"${ipAddress}"}`
+            : `{"VirtualParameters.PPPUsername":"${ipAddress}"}`;
+
+        // Query device by IP address or PPPoE Username
+        const response = await fetch(`${genieacsUrl}/devices?query=${queryStr}`, {
             method: 'GET',
             headers: headers
         });
@@ -268,8 +274,14 @@ async function changeWiFiViaGenieACS(ipAddress, newSSID, newPassword) {
             headers['Authorization'] = `Basic ${auth}`;
         }
 
-        // Step 1: Find device by IP
-        const devicesResponse = await fetch(`${genieacsUrl}/devices?query={"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress":"${ipAddress}"}`, {
+        // Helper to build query (IP vs PPPoE Username)
+        const isIpAddress = /^(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/.test(ipAddress);
+        let queryStr = isIpAddress 
+            ? `{"InternetGatewayDevice.WANDevice.1.WANConnectionDevice.1.WANIPConnection.1.ExternalIPAddress":"${ipAddress}"}`
+            : `{"VirtualParameters.PPPUsername":"${ipAddress}"}`;
+
+        // Step 1: Find device by IP or PPPoE Username
+        const devicesResponse = await fetch(`${genieacsUrl}/devices?query=${queryStr}`, {
             method: 'GET',
             headers: headers
         });
