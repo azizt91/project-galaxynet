@@ -26,7 +26,7 @@ class PWAInstaller {
     async registerServiceWorker() {
         if ('serviceWorker' in navigator) {
             try {
-                const registration = await navigator.serviceWorker.register('/sw.js');
+                const registration = await navigator.serviceWorker.register('./sw.js');
                 console.log('PWA: Service Worker registered successfully', registration);
                 
                 // Handle service worker updates
@@ -95,16 +95,16 @@ class PWAInstaller {
         // Create install button
         const installButton = document.createElement('button');
         installButton.id = 'pwa-install-btn';
-        installButton.innerHTML = '<i class="fas fa-download"></i> Install App';
+        installButton.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" viewBox="0 0 256 256" style="margin-right: 4px;"><path d="M224,144v64a16,16,0,0,1-16,16H48a16,16,0,0,1-16-16V144a8,8,0,0,1,16,0v64H208V144a8,8,0,0,1,16,0Zm-101.66,5.66a8,8,0,0,0,11.32,0l40-40a8,8,0,0,0-11.32-11.32L136,124.69V32a8,8,0,0,0-16,0v92.69L93.66,98.34a8,8,0,0,0-11.32,11.32Z"></path></svg> Install App';
         installButton.style.cssText = `
-            background-color: #6a5acd;
+            background-color: #FF6B2B;
             color: white;
             border: none;
             padding: 12px 20px;
             border-radius: 25px;
             font-weight: 500;
             cursor: pointer;
-            box-shadow: 0 4px 15px rgba(106, 90, 205, 0.3);
+            box-shadow: 0 4px 15px rgba(255, 107, 43, 0.3);
             transition: all 0.3s ease;
             display: flex;
             align-items: center;
@@ -113,12 +113,12 @@ class PWAInstaller {
 
         installButton.addEventListener('mouseover', () => {
             installButton.style.transform = 'translateY(-2px)';
-            installButton.style.boxShadow = '0 6px 20px rgba(106, 90, 205, 0.4)';
+            installButton.style.boxShadow = '0 6px 20px rgba(255, 107, 43, 0.4)';
         });
 
         installButton.addEventListener('mouseout', () => {
             installButton.style.transform = 'translateY(0)';
-            installButton.style.boxShadow = '0 4px 15px rgba(106, 90, 205, 0.3)';
+            installButton.style.boxShadow = '0 4px 15px rgba(255, 107, 43, 0.3)';
         });
 
         installButton.addEventListener('click', () => {
