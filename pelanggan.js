@@ -368,17 +368,51 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('customer-bill').value = price;
     }
 
-    function openAddForm() {
+    async function openAddForm() {
         customerForm.reset();
         currentEditingProfileId = null;
         modalTitle.textContent = 'Tambah Pelanggan';
         saveBtnText.textContent = 'Simpan';
         newUserFields.classList.remove('hidden');
         editUserFields.classList.add('hidden');
-        document.getElementById('customer-email').required = true;
-        document.getElementById('customer-password').required = true;
+        
+        const emailInput = document.getElementById('customer-email');
+        const passInput = document.getElementById('customer-password');
+        emailInput.required = true;
+        passInput.required = true;
+        
         lastView = 'list';
         switchView('form');
+        
+        emailInput.placeholder = 'Memuat...';
+        passInput.placeholder = 'Memuat...';
+        
+        // Auto-generate email and password
+        try {
+            const { data: customers, error } = await supabase
+                .from('profiles')
+                .select('idpl')
+                .like('idpl', 'CST%');
+
+            let nextNumber = 1;
+            if (!error && customers && customers.length > 0) {
+                const numbers = customers
+                    .map(c => {
+                        const match = c.idpl.match(/^CST(\d+)$/);
+                        return match ? parseInt(match[1], 10) : 0;
+                    })
+                    .filter(num => !isNaN(num));
+                
+                if (numbers.length > 0) {
+                    nextNumber = Math.max(...numbers) + 1;
+                }
+            }
+            
+            emailInput.value = `client${nextNumber}@gmail.com`;
+            passInput.value = 'password123';
+        } catch (e) {
+            console.error('Error auto-generating credentials:', e);
+        }
     }
 
     async function openEditForm(profile) {
