@@ -389,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Ambil data Unpaid dengan filter (hanya unpaid, tidak termasuk partially_paid)
                 const { data: unpaid, error: unpaidErr } = await supabase
                     .from('invoices')
-                    .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                    .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                     .eq('status', 'unpaid')
                     .eq('invoice_period', targetPeriode)
                     .order('created_at', { ascending: false });
@@ -400,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const { data: installment, error: installmentErr } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .eq('status', 'partially_paid')
                         .eq('invoice_period', targetPeriode)
                         .order('created_at', { ascending: false });
@@ -411,7 +411,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Fallback: ambil data berdasarkan kondisi amount_paid > 0 dan status != 'paid'
                     const { data: installmentFallback, error: fallbackErr } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .neq('status', 'paid')
                         .gt('amount_paid', 0)
                         .eq('invoice_period', targetPeriode)
@@ -427,7 +427,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 while (true) {
                     const { data: paidChunk, error: paidErrChunk } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .eq('status', 'paid')
                         .eq('invoice_period', targetPeriode)
                         .order('paid_at', { ascending: false })
@@ -449,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Ambil data Unpaid tanpa filter (hanya unpaid, tidak termasuk partially_paid)
                 const { data: unpaid, error: unpaidErr } = await supabase
                     .from('invoices')
-                    .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                    .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                     .eq('status', 'unpaid')
                     .order('created_at', { ascending: false });
                 if (unpaidErr) throw unpaidErr;
@@ -459,7 +459,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 try {
                     const { data: installment, error: installmentErr } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .eq('status', 'partially_paid')
                         .order('created_at', { ascending: false });
                     if (installmentErr) throw installmentErr;
@@ -469,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Fallback: ambil data berdasarkan kondisi amount_paid > 0 dan status != 'paid'
                     const { data: installmentFallback, error: fallbackErr } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .neq('status', 'paid')
                         .gt('amount_paid', 0)
                         .order('created_at', { ascending: false });
@@ -484,7 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 while (true) {
                     const { data: paidChunk, error: paidErrChunk } = await supabase
                         .from('invoices')
-                        .select(`id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
+                        .select(`id, customer_id, invoice_period, amount, total_due, amount_paid, status, paid_at, payment_method, broadcast_count, profiles (full_name, idpl, whatsapp_number)`)
                         .eq('status', 'paid')
                         .order('paid_at', { ascending: false })
                         .range(page * CHUNK_SIZE, (page + 1) * CHUNK_SIZE - 1);
@@ -676,6 +676,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.error('Failed to save template', e);
             }
 
+            let appUrl = 'http://gardunetwork.netlify.app/';
+            try {
+                const { data } = await supabase.from('whatsapp_settings').select('setting_value').eq('setting_key', 'app_url').single();
+                if (data && data.setting_value) {
+                    appUrl = data.setting_value;
+                }
+            } catch(e) {
+                console.error('Failed to load app_url', e);
+            }
+
             // Ambil invoice IDs yang akan diproses batch ini
             const batchIds = checkedBoxes.slice(0, limit).map(cb => cb.value);
             hideModal();
@@ -698,6 +708,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     continue;
                 }
 
+                let customerEmail = '-';
+                try {
+                    const { data: email, error: emailError } = await supabase.rpc('get_user_email', {
+                        user_id: invoice.customer_id
+                    });
+                    if (!emailError && email) customerEmail = email;
+                } catch (err) {
+                    console.error("Gagal mengambil email:", err);
+                }
+
                 const formatter = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 });
                 let target = String(invoice.profiles.whatsapp_number).replace(/[^0-9]/g, '');
                 if (target.startsWith('0')) target = '62' + target.substring(1);
@@ -710,8 +730,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     .replace(/{jumlah_dibayar}/g, formatter.format(invoice.amount_paid || 0))
                     .replace(/{sisa_tagihan}/g, formatter.format(Math.max(0, invoice.amount - (invoice.amount_paid || 0))))
                     .replace(/{metode_pembayaran}/g, invoice.payment_method || '-')
-                    .replace(/{app_url}/g, 'http://gardunetwork.netlify.app/')
-                    .replace(/{email_pelanggan}/g, '-')
+                    .replace(/{app_url}/g, appUrl)
+                    .replace(/{email_pelanggan}/g, customerEmail)
                     .replace(/{pesan_custom}/g, '');
 
                 try {
@@ -1185,9 +1205,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function sendWhatsAppMessage(rowData) {
         let customTemplate = `Informasi Tagihan WiFi Anda\n\nHai Bapak/Ibu {nama_pelanggan},\nID Pelanggan: {idpl}\n\nInformasi tagihan Bapak/Ibu bulan ini adalah:\nJumlah Tagihan: {total_tagihan}\nPeriode Tagihan: {periode}\n\nBayar tagihan Anda di salah satu rekening di bawah ini:\n- Seabank 901307925714 An. TAUFIQ AZIZ\n- BCA 3621053653 An. TAUFIQ AZIZ\n- BSI 7211806138 An. TAUFIQ AZIZ\n- Dana 089609497390 An. TAUFIQ AZIZ\n\nTerima kasih atas kepercayaan Anda menggunakan layanan kami.\n_____________________________\n*Ini adalah pesan otomatis. Jika telah membayar tagihan, abaikan pesan ini.`;
+        let appUrl = 'http://gardunetwork.netlify.app/';
         try {
-            const { data } = await supabase.from('whatsapp_settings').select('setting_value').eq('setting_key', 'template_custom_message').single();
-            if (data && data.setting_value) customTemplate = data.setting_value;
+            const { data } = await supabase.from('whatsapp_settings').select('setting_key, setting_value').in('setting_key', ['template_custom_message', 'app_url']);
+            if (data) {
+                const templateData = data.find(item => item.setting_key === 'template_custom_message');
+                if (templateData && templateData.setting_value) customTemplate = templateData.setting_value;
+                const urlData = data.find(item => item.setting_key === 'app_url');
+                if (urlData && urlData.setting_value) appUrl = urlData.setting_value;
+            }
         } catch(e) {}
         if (!rowData || !rowData.profiles) {
             showErrorNotification('Data pelanggan tidak valid untuk mengirim WhatsApp');
@@ -1204,6 +1230,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        let customerEmail = '-';
+        try {
+            const { data: email, error: emailError } = await supabase.rpc('get_user_email', {
+                user_id: rowData.customer_id
+            });
+            if (!emailError && email) customerEmail = email;
+        } catch (err) {
+            console.error("Gagal mengambil email:", err);
+        }
+
         let messageTemplate = customTemplate;
 
         const message = messageTemplate
@@ -1214,8 +1250,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/{jumlah_dibayar}/g, new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(rowData.amount_paid || 0))
             .replace(/{sisa_tagihan}/g, new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(Math.max(0, rowData.amount - (rowData.amount_paid || 0))))
             .replace(/{metode_pembayaran}/g, rowData.payment_method || '-')
-            .replace(/{app_url}/g, 'http://gardunetwork.netlify.app/')
-            .replace(/{email_pelanggan}/g, '-')
+            .replace(/{app_url}/g, appUrl)
+            .replace(/{email_pelanggan}/g, customerEmail)
             .replace(/{pesan_custom}/g, '');
 
         let cleanedNumber = String(whatsappNumber).replace(/[^0-9+]/g, '');

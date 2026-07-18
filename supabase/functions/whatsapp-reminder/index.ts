@@ -26,9 +26,9 @@ serve(async (req) => {
     if (profilesError) throw profilesError;
 
     const potentialUsers = profiles.filter(p => {
-        if (!p.installation_date) return false;
-        const installationDay = new Date(p.installation_date).getDate();
-        return installationDay === currentDay;
+      if (!p.installation_date) return false;
+      const installationDay = new Date(p.installation_date).getDate();
+      return installationDay === currentDay;
     });
 
     if (potentialUsers.length === 0) {
@@ -74,6 +74,18 @@ serve(async (req) => {
     if (packagesError) throw packagesError;
     const packagesMap = new Map(packages.map(p => [p.id, p.price]));
 
+    // Ambil app_url dari database (jika ada)
+    let appUrl = 'http://galaxynet-pay.netlify.app/';
+    const { data: appUrlData, error: appUrlError } = await supabase
+      .from('whatsapp_settings')
+      .select('setting_value')
+      .eq('setting_key', 'app_url')
+      .single();
+
+    if (!appUrlError && appUrlData && appUrlData.setting_value) {
+      appUrl = appUrlData.setting_value;
+    }
+
     // 6. Kirim notifikasi ke pengguna yang sudah difilter
     let successCount = 0;
     let failureCount = 0;
@@ -86,13 +98,48 @@ serve(async (req) => {
         continue;
       }
 
+      // Ambil email pelanggan
+      let customerEmail = '-';
+      const { data: emailData, error: emailError } = await supabase.rpc('get_user_email', {
+        user_id: user.id
+      });
+      if (!emailError && emailData) {
+        customerEmail = emailData;
+      }
+
+      const formattedPrice = new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(price);
+
       // Membuat isi pesan sesuai template
-      const message = `*Informasi Tagihan WiFi Anda*\n\nHai Bapak/Ibu ${user.full_name},\nID Pelanggan: ${user.idpl || '-'}\n\nTagihan Anda untuk periode *${currentMonthYear}* sebesar *Rp${new Intl.NumberFormat('id-ID').format(price)}* telah jatuh tempo.\n\n*PEMBAYARAN LEBIH MUDAH DENGAN QRIS!*\nScan kode QR di gambar pesan ini menggunakan aplikasi m-banking atau e-wallet Anda (DANA, GoPay, OVO, dll). Pastikan nominal transfer sesuai tagihan.\n\nUntuk pembayaran via QRIS, silakan lihat gambar pada link berikut:\nhttps://bayardong.online/sneat/assets/img/qris.jpeg\n\nAtau transfer manual ke rekening berikut:\n• Seabank: 901307925714\n• BCA: 3621053653\n• BSI: 7211806138\n(an. TAUFIQ AZIZ)\n\nTerima kasih atas kepercayaan Anda.\n_____________________________\n*_Pesan ini dibuat otomatis. Abaikan jika sudah membayar._`;
+      const message = `*FAKTUR TAGIHAN GALAXY.NETWORK by:ATLAS LINTAS INDONESIA* 📄
+
+Halo Bapak/Ibu *${user.full_name}*, 👋
+Berikut adalah rincian tagihan WiFi Anda:
+
+Periode: *${currentMonthYear}*
+Nominal: *${formattedPrice}*
+Status: *Belum Dibayar*
+
+Mohon untuk dapat melakukan pembayaran sebelum tanggal 25, pembayaran bisa dilakukan melalui:
+• *DANA*: 082122786521
+(Atas nama MUKHLIS NUR IMANNUDIN)
+Atau bayar langsung di Kantor GALAXY.NETWORK.BY:PT ATLAS LINTAS INDONESIA
+Desa Semboja,dk.jatipelag rt.09 rw.02, kec.pagerbarang kab.tegal
+
+Harap konfirmasi dengan mengirimkan foto bukti transfer ke nomor ini Whatapps (085934599350). Terima kasih telah berlangganan GALAXY.NET! ✨
+
+Anda dapat melihat riwayat pembayaran dan status tagihan terbaru melalui dasbor pelanggan di link URL dibawah ini
+
+${appUrl}
+Login dengan akun anda
+- *Email*: ${customerEmail}
+- *Password*: password123
+_____________________________
+_*Pesan ini dibuat otomatis. Abaikan pesan ini jika tagihan sudah dibayarkan._`;
 
       // Panggil fungsi 'send-whatsapp-notification' yang sudah ada
       try {
         console.log(`Mengirim pesan ke ${user.full_name} (${user.whatsapp_number})...`);
-        
+
         const response = await fetch(Deno.env.get('SUPABASE_URL')! + '/functions/v1/send-whatsapp-notification', {
           method: 'POST',
           headers: {
