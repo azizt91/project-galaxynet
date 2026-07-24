@@ -273,6 +273,101 @@ EXCEPTION
 END;
 $$;
 
+--
+-- Name: create_monthly_invoices_v3(integer, integer); Type: FUNCTION; Schema: public; Owner: postgres
+--
+
+CREATE FUNCTION public.create_monthly_invoices_v3(p_month integer DEFAULT NULL, p_year integer DEFAULT NULL) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    AS $$
+DECLARE
+    target_invoice_period TEXT;
+    created_invoices_count INTEGER := 0;
+    customer_record RECORD;
+    month_name TEXT;
+    target_date DATE;
+    target_m INTEGER;
+    target_y INTEGER;
+BEGIN
+    target_date := (NOW() AT TIME ZONE 'Asia/Jakarta')::DATE;
+    target_m := COALESCE(p_month, EXTRACT(MONTH FROM target_date)::INTEGER);
+    target_y := COALESCE(p_year, EXTRACT(YEAR FROM target_date)::INTEGER);
+
+    SELECT 
+        CASE target_m
+            WHEN 1 THEN 'Januari'
+            WHEN 2 THEN 'Februari'
+            WHEN 3 THEN 'Maret'
+            WHEN 4 THEN 'April'
+            WHEN 5 THEN 'Mei'
+            WHEN 6 THEN 'Juni'
+            WHEN 7 THEN 'Juli'
+            WHEN 8 THEN 'Agustus'
+            WHEN 9 THEN 'September'
+            WHEN 10 THEN 'Oktober'
+            WHEN 11 THEN 'November'
+            WHEN 12 THEN 'Desember'
+        END
+    INTO month_name;
+
+    target_invoice_period := month_name || ' ' || target_y;
+
+    FOR customer_record IN 
+        SELECT 
+            prof.id as customer_id,
+            pack.price as customer_price, 
+            pack.id as customer_package_id
+        FROM 
+            public.profiles prof
+        JOIN 
+            public.packages pack ON prof.package_id = pack.id
+        WHERE 
+            prof.status = 'AKTIF' 
+            AND prof.role = 'USER'
+            AND prof.package_id IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1 FROM public.invoices inv 
+                WHERE inv.customer_id = prof.id AND LOWER(TRIM(inv.invoice_period)) = LOWER(TRIM(target_invoice_period))
+            )
+    LOOP
+        INSERT INTO public.invoices (
+            customer_id, 
+            package_id, 
+            invoice_period, 
+            amount, 
+            total_due, 
+            status, 
+            due_date
+        ) VALUES (
+            customer_record.customer_id,
+            customer_record.customer_package_id,
+            target_invoice_period,
+            customer_record.customer_price,
+            customer_record.customer_price,
+            'unpaid',
+            (make_date(target_y, target_m, 1) + interval '1 month' + interval '9 days')::date 
+        );
+        created_invoices_count := created_invoices_count + 1;
+    END LOOP;
+
+    IF created_invoices_count > 0 THEN
+        RETURN jsonb_build_object(
+            'status', 'success',
+            'message', 'Berhasil membuat ' || created_invoices_count || ' tagihan baru untuk periode ' || target_invoice_period
+        );
+    ELSE
+        RETURN jsonb_build_object(
+            'status', 'info',
+            'message', 'Tidak ada tagihan baru yang dibuat. Semua pelanggan aktif sudah memiliki tagihan untuk periode ' || target_invoice_period
+        );
+    END IF;
+
+EXCEPTION
+    WHEN OTHERS THEN
+        RETURN jsonb_build_object('status', 'error', 'message', 'Error: ' || SQLERRM);
+END;
+$$;
+
 
 ALTER FUNCTION public.create_monthly_invoices_v2() OWNER TO postgres;
 

@@ -202,9 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         invoiceList.addEventListener('click', handleInvoiceListClick);
 
-        if (addInvoiceBtn) {
-            addInvoiceBtn.addEventListener('click', handleCreateInvoices);
-        }
+        initCreateInvoiceModal();
 
         // Back button from detail view
         const backFromDetailBtn = document.getElementById('back-from-detail');
@@ -1265,32 +1263,145 @@ document.addEventListener('DOMContentLoaded', () => {
         showSuccessNotification(`Pesan WhatsApp untuk ${customerName} telah dibuka!`);
     }
 
-    async function handleCreateInvoices() {
-        const currentMonthName = new Date().toLocaleString('id-ID', { month: 'long' });
-        const currentYear = new Date().getFullYear();
-        const confirmMessage = `Apakah Anda yakin ingin membuat tagihan untuk bulan ${currentMonthName} ${currentYear}? Proses ini akan dijalankan untuk semua pelanggan aktif yang belum memiliki tagihan bulan ini.`;
+    function initCreateInvoiceModal() {
+        const createInvoiceModal = document.getElementById('create-invoice-modal');
+        const closeBtn = document.getElementById('close-create-invoice-modal');
+        const cancelBtn = document.getElementById('cancel-create-invoice-btn');
+        const confirmBtn = document.getElementById('confirm-create-invoice-btn');
+        const monthSelect = document.getElementById('create-invoice-month');
+        const yearSelect = document.getElementById('create-invoice-year');
 
-        if (!confirm(confirmMessage)) {
-            return;
+        if (!createInvoiceModal || !addInvoiceBtn) return;
+
+        // Populate year selector (current year - 1 to current year + 3)
+        const currentYear = new Date().getFullYear();
+        if (yearSelect) {
+            yearSelect.innerHTML = '';
+            for (let y = currentYear - 1; y <= currentYear + 3; y++) {
+                const opt = document.createElement('option');
+                opt.value = y;
+                opt.textContent = y;
+                if (y === currentYear) opt.selected = true;
+                yearSelect.appendChild(opt);
+            }
         }
 
-        showPaymentLoading('Membuat tagihan bulanan...');
+        // Show modal on FAB click
+        addInvoiceBtn.addEventListener('click', () => {
+            const now = new Date();
+            if (monthSelect) monthSelect.value = (now.getMonth() + 1).toString();
+            if (yearSelect) yearSelect.value = now.getFullYear().toString();
+            createInvoiceModal.classList.remove('hidden');
+        });
+
+        // Hide modal helper
+        const hideModal = () => createInvoiceModal.classList.add('hidden');
+        if (closeBtn) closeBtn.addEventListener('click', hideModal);
+        if (cancelBtn) cancelBtn.addEventListener('click', hideModal);
+        createInvoiceModal.addEventListener('click', (e) => {
+            if (e.target === createInvoiceModal) hideModal();
+        });
+
+        // Process creation
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', async () => {
+                const monthIndex = parseInt(monthSelect.value, 10);
+                const selectedYear = parseInt(yearSelect.value, 10);
+
+                const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+                const targetMonthName = monthNames[monthIndex];
+
+                hideModal();
+
+                const confirmMessage = `Apakah Anda yakin ingin membuat tagihan untuk bulan ${targetMonthName} ${selectedYear}? Proses ini akan dijalankan untuk semua pelanggan aktif yang belum memiliki tagihan pada periode tersebut.`;
+
+                if (!confirm(confirmMessage)) {
+                    return;
+                }
+
+                await handleCreateInvoicesForPeriod(monthIndex, selectedYear);
+            });
+        }
+    }
+
+    async function handleCreateInvoicesForPeriod(monthIndex, targetYear) {
+        const monthNames = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+        const targetMonthName = monthNames[monthIndex];
+        const targetPeriod = `${targetMonthName} ${targetYear}`;
+
+        showPaymentLoading(`Membuat tagihan untuk ${targetPeriod}...`);
 
         try {
-            const { data, error } = await supabase.rpc('create_monthly_invoices_v2');
+            // 1. Ambil semua pelanggan aktif yang punya paket
+            const { data: activeProfiles, error: profError } = await supabase
+                .from('profiles')
+                .select('id, package_id, packages(price)')
+                .eq('status', 'AKTIF')
+                .eq('role', 'USER')
+                .not('package_id', 'is', null);
+
+            if (profError) throw new Error(`Gagal mengambil data pelanggan: ${profError.message}`);
+
+            if (!activeProfiles || activeProfiles.length === 0) {
+                hidePaymentLoading();
+                showSuccessNotification(`Tidak ada pelanggan aktif yang ditemukan.`);
+                return;
+            }
+
+            // 2. Cek tagihan yang sudah ada untuk periode ini
+            const { data: existingInvoices, error: invError } = await supabase
+                .from('invoices')
+                .select('customer_id')
+                .ilike('invoice_period', targetPeriod);
+
+            if (invError) throw new Error(`Gagal mengecek tagihan yang ada: ${invError.message}`);
+
+            const existingCustomerIds = new Set((existingInvoices || []).map(inv => inv.customer_id));
+
+            // 3. Filter pelanggan yang BELUM punya tagihan di periode tersebut
+            const profilesToCreate = activeProfiles.filter(p => !existingCustomerIds.has(p.id));
+
+            if (profilesToCreate.length === 0) {
+                hidePaymentLoading();
+                showSuccessNotification(`Tidak ada tagihan baru yang dibuat. Semua pelanggan aktif sudah memiliki tagihan untuk periode ${targetPeriod}.`);
+                return;
+            }
+
+            // 4. Hitung tanggal jatuh tempo (tanggal 10 bulan berikutnya dari targetPeriod)
+            const nextMonthDate = new Date(targetYear, monthIndex, 10);
+            const yyyy = nextMonthDate.getFullYear();
+            const mm = String(nextMonthDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(nextMonthDate.getDate()).padStart(2, '0');
+            const dueDateStr = `${yyyy}-${mm}-${dd}`;
+
+            // 5. Siapkan data tagihan baru
+            const newInvoicesPayload = profilesToCreate.map(profile => {
+                const packagePrice = profile.packages ? profile.packages.price : 0;
+                return {
+                    customer_id: profile.id,
+                    package_id: profile.package_id,
+                    invoice_period: targetPeriod,
+                    amount: packagePrice,
+                    total_due: packagePrice,
+                    amount_paid: 0,
+                    status: 'unpaid',
+                    due_date: dueDateStr
+                };
+            });
+
+            // 6. Insert data ke tabel invoices
+            const { data: inserted, error: insertError } = await supabase
+                .from('invoices')
+                .insert(newInvoicesPayload)
+                .select();
 
             hidePaymentLoading();
 
-            if (error) {
-                throw new Error(error.message);
-            }
+            if (insertError) throw new Error(insertError.message);
 
-            if (data && data.status === 'success') {
-                showSuccessNotification(data.message);
-                fetchData();
-            } else {
-                throw new Error(data.message || 'Terjadi kesalahan di server.');
-            }
+            const count = inserted ? inserted.length : newInvoicesPayload.length;
+            showSuccessNotification(`Berhasil membuat ${count} tagihan baru untuk periode ${targetPeriod}.`);
+            fetchData();
 
         } catch (error) {
             hidePaymentLoading();

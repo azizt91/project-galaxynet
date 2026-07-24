@@ -194,6 +194,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
+            if (id === 'export-csv-btn') {
+                closeFABMenu(); // Close FAB menu if open
+                handleExportCSV();
+                return;
+            }
+
             if (id === 'fab-main-btn') {
                 toggleFABMenu();
                 return;
@@ -1039,4 +1045,99 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     function showSuccessNotification(message) { alert(message); }
     function showErrorNotification(message) { alert(message); }
+
+    async function handleExportCSV() {
+        try {
+            // 1. Fetch all customer profiles with package details
+            const { data: profiles, error } = await supabase
+                .from('profiles')
+                .select('*, packages(price)')
+                .eq('role', 'USER')
+                .order('created_at', { ascending: true });
+
+            if (error) throw error;
+
+            if (!profiles || profiles.length === 0) {
+                alert('Tidak ada data pelanggan untuk diexport.');
+                return;
+            }
+
+            // 2. Fetch user emails gracefully with Promise.allSettled
+            const emailResults = await Promise.allSettled(
+                profiles.map(p =>
+                    supabase.rpc('get_user_email', { user_id: p.id })
+                        .then(res => res.data || '')
+                        .catch(() => '')
+                )
+            );
+            const emails = emailResults.map(r => (r.status === 'fulfilled' && r.value) ? r.value : '');
+
+            // 3. Header columns
+            const headers = [
+                'email', 'password', 'full_name', 'address', 'whatsapp_number',
+                'gender', 'status', 'package_id', 'amount', 'installation_date',
+                'latitude', 'longitude', 'device_type', 'ip_static_pppoe'
+            ];
+
+            // 4. Map profiles to rows
+            const rows = profiles.map((p, idx) => {
+                const email = emails[idx] || '';
+                const password = ''; // Passwords stored as hashes in DB, exported as empty string
+                const fullName = p.full_name || '';
+                const address = p.address || '';
+                const whatsapp = p.whatsapp_number || '';
+                const gender = p.gender || '';
+                const status = p.status || 'AKTIF';
+                const packageId = p.package_id || '';
+                const amount = p.packages ? p.packages.price : (p.amount || '');
+                const installDate = p.installation_date ? new Date(p.installation_date).toISOString().split('T')[0] : '';
+                const lat = p.latitude || '';
+                const lng = p.longitude || '';
+                const device = p.device_type || '';
+                const ip = p.ip_static_pppoe || '';
+
+                return [
+                    email, password, fullName, address, whatsapp,
+                    gender, status, packageId, amount, installDate,
+                    lat, lng, device, ip
+                ];
+            });
+
+            // 5. Build CSV text with proper escaping
+            const csvRows = [
+                headers.join(','),
+                ...rows.map(row =>
+                    row.map(field => {
+                        const str = String(field ?? '');
+                        if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+                            return `"${str.replace(/"/g, '""')}"`;
+                        }
+                        return str;
+                    }).join(',')
+                )
+            ];
+
+            const csvString = csvRows.join('\r\n');
+
+            // 6. Download CSV file with UTF-8 BOM
+            const blob = new Blob(['\uFEFF' + csvString], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            const now = new Date();
+            const dateStr = now.toISOString().split('T')[0];
+
+            link.href = url;
+            link.download = `data_pelanggan_${dateStr}.csv`;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }, 200);
+
+        } catch (err) {
+            console.error('Error exporting CSV:', err);
+            alert('Gagal mengeksport data CSV: ' + err.message);
+        }
+    }
 });

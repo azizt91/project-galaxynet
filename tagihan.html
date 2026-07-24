@@ -489,8 +489,63 @@
     </div>
   </div>
 
+  <!-- Create Monthly Invoice Modal (Orange Theme) -->
+  <div id="create-invoice-modal" class="hidden fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 font-sans backdrop-blur-sm transition-opacity">
+    <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden flex flex-col">
+      <div class="bg-[#FF6B2B] p-4 flex items-center justify-between text-white shrink-0">
+        <h3 class="text-lg font-bold flex items-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          Buat Tagihan Bulanan
+        </h3>
+        <button id="close-create-invoice-modal" class="text-white hover:text-orange-200 transition-colors text-2xl leading-none">&times;</button>
+      </div>
+      
+      <div class="p-5 space-y-4">
+        <p class="text-sm text-gray-600">
+          Pilih bulan dan tahun untuk membuat tagihan bagi semua pelanggan aktif yang belum memiliki tagihan pada periode tersebut.
+        </p>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Bulan</label>
+            <select id="create-invoice-month" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#FF6B2B] focus:border-[#FF6B2B] bg-white">
+              <option value="1">Januari</option>
+              <option value="2">Februari</option>
+              <option value="3">Maret</option>
+              <option value="4">April</option>
+              <option value="5">Mei</option>
+              <option value="6">Juni</option>
+              <option value="7">Juli</option>
+              <option value="8">Agustus</option>
+              <option value="9">September</option>
+              <option value="10">Oktober</option>
+              <option value="11">November</option>
+              <option value="12">Desember</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-bold text-gray-700 mb-1">Tahun</label>
+            <select id="create-invoice-year" class="w-full border border-gray-300 rounded-lg p-2.5 text-sm focus:ring-2 focus:ring-[#FF6B2B] focus:border-[#FF6B2B] bg-white">
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 shrink-0">
+        <button id="cancel-create-invoice-btn" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors">Batal</button>
+        <button id="confirm-create-invoice-btn" class="px-4 py-2 text-sm font-medium text-white bg-[#FF6B2B] hover:bg-[#e0581e] rounded-lg transition-colors flex items-center gap-2 shadow-md">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+          Buat Tagihan
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="whatsapp-notification.js" type="module"></script>
-  <script src="tagihan.js?v=1.0.3" type="module"></script>
+  <script src="tagihan.js?v=1.0.4" type="module"></script>
 
   <style>
     /* Tab Styles */
